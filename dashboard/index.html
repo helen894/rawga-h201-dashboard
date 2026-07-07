@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로가 × H201 통합 관리 대시보드</title>
+<style>
+  :root {
+    --bg: #f4f6f9; --card: #ffffff; --ink: #1c2733; --sub: #6b7684; --line: #e3e8ee;
+    --rawga: #2563eb; --h201: #7c3aed;
+    --red: #dc2626; --red-bg: #fef2f2; --orange: #ea580c; --orange-bg: #fff7ed;
+    --yellow: #a16207; --yellow-bg: #fefce8; --green: #16a34a;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: "Pretendard", "Malgun Gothic", -apple-system, sans-serif; font-size: 14px; }
+  a { color: inherit; }
+  header { background: #111827; color: #fff; padding: 14px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 17px; font-weight: 700; }
+  header h1 .x { color: #9ca3af; font-weight: 400; }
+  #syncInfo { color: #9ca3af; font-size: 12px; margin-left: auto; }
+  #demoBadge { background: #b45309; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; display: none; }
+  nav { display: flex; gap: 4px; background: #fff; border-bottom: 1px solid var(--line); padding: 0 16px; position: sticky; top: 0; z-index: 5; }
+  nav button { border: 0; background: none; padding: 12px 16px; font-size: 14px; font-weight: 600; color: var(--sub); cursor: pointer; border-bottom: 2px solid transparent; }
+  nav button.on { color: var(--ink); border-bottom-color: var(--ink); }
+  main { max-width: 1180px; margin: 0 auto; padding: 18px 16px 60px; }
+  .view { display: none; }
+  .view.on { display: block; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 14px; margin-bottom: 12px; color: var(--ink); }
+  .muted { color: var(--sub); font-size: 12px; }
+  /* 통합 뷰 */
+  .layout { display: grid; grid-template-columns: 1fr 300px; gap: 14px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; margin-bottom: 8px; background: #fff; }
+  .item.overdue { border-left-color: var(--red); background: var(--red-bg); }
+  .item.today { border-left-color: var(--orange); background: var(--orange-bg); }
+  .item.this_week { border-left-color: #eab308; background: var(--yellow-bg); }
+  .item .body { flex: 1; min-width: 0; }
+  .item .title { font-weight: 600; text-decoration: none; word-break: break-all; }
+  .item .title:hover { text-decoration: underline; }
+  .badge { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; color: #fff; flex-shrink: 0; margin-top: 2px; }
+  .badge.rawga { background: var(--rawga); } .badge.h201 { background: var(--h201); }
+  .chips { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 11px; background: #eef1f5; color: var(--sub); padding: 1px 7px; border-radius: 999px; }
+  .chip.hot { background: #fee2e2; color: var(--red); font-weight: 600; }
+  .score { font-weight: 700; font-size: 15px; min-width: 44px; text-align: right; }
+  .kindTag { font-size: 11px; color: var(--sub); }
+  /* 슬라이더 */
+  .slider-row { margin-bottom: 12px; }
+  .slider-row label { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 3px; }
+  .slider-row input[type=range] { width: 100%; }
+  .counts { display: flex; gap: 8px; margin-bottom: 12px; }
+  .count { flex: 1; text-align: center; border: 1px solid var(--line); border-radius: 8px; padding: 8px 4px; }
+  .count b { display: block; font-size: 19px; }
+  .count.red b { color: var(--red); } .count.orange b { color: var(--orange); } .count.yellow b { color: var(--yellow); }
+  /* 테이블 */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-size: 12px; color: var(--sub); font-weight: 600; }
+  tr.done td { opacity: .45; text-decoration: line-through; }
+  /* 폼/버튼 */
+  button.btn { border: 1px solid var(--line); background: #fff; border-radius: 7px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  button.btn:hover { background: #f3f4f6; }
+  button.btn.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  button.btn.sm { padding: 3px 9px; font-size: 12px; }
+  input[type=text], input[type=date], select, textarea { border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; font-size: 13px; font-family: inherit; background: #fff; }
+  input.inline-date { padding: 3px 6px; font-size: 12px; }
+  .form-grid { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .form-grid input[type=text] { flex: 1; min-width: 180px; }
+  /* 멘션 */
+  .mention { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .mention .head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; }
+  .mention .author { font-weight: 700; }
+  .mention .txt { white-space: pre-wrap; word-break: break-all; }
+  .mention .acts { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .replyBox { margin-top: 8px; display: none; gap: 6px; }
+  .replyBox.on { display: flex; }
+  .replyBox textarea { flex: 1; min-height: 54px; }
+  .mention.doneLocal { opacity: .5; }
+  /* 토스트 */
+  #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .25s; max-width: 90vw; z-index: 50; }
+  #toast.on { opacity: 1; }
+  #toast.err { background: var(--red); }
+</style>
+</head>
+<body>
+<header>
+  <h1>로가 <span class="x">×</span> H201 <span class="x">통합 관리</span></h1>
+  <span id="demoBadge" style="cursor:pointer" title="클릭해서 설정">DEMO — 클릭해 설정</span>
+  <span id="syncInfo">불러오는 중…</span>
+  <button class="btn sm" id="btnRefresh" style="background:#374151;color:#fff;border-color:#374151">새로고침</button>
+  <button class="btn sm" id="btnSettings" style="background:#374151;color:#fff;border-color:#374151">⚙ 설정</button>
+</header>
+<nav>
+  <button data-view="unified" class="on">① 통합 우선순위</button>
+  <button data-view="rawga">② 로가 (아사나)</button>
+  <button data-view="h201">③ H201 (슬랙)</button>
+</nav>
+<main>
+  <!-- ① 통합 우선순위 -->
+  <section class="view on" id="view-unified">
+    <div class="layout">
+      <div>
+        <div class="card" id="llmCard" style="display:none"></div>
+        <div id="priorityList"></div>
+      </div>
+      <div>
+        <div class="card">
+          <h2>현황</h2>
+          <div class="counts" id="counts"></div>
+          <div class="muted" id="todayLabel"></div>
+        </div>
+        <div class="card">
+          <h2>가중치 (rules.json)</h2>
+          <div id="sliders"></div>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn primary" id="btnSaveRules">규칙 저장</button>
+            <button class="btn" id="btnResetRules">기본값</button>
+          </div>
+          <p class="muted" style="margin-top:8px">움직이면 즉시 재정렬. 저장하면 rules 테이블에 반영(프록시 경유).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② 로가 (아사나) -->
+  <section class="view" id="view-rawga">
+    <div class="card">
+      <h2>태스크 생성</h2>
+      <div class="form-grid">
+        <input type="text" id="newTaskName" placeholder="태스크 이름">
+        <select id="newTaskProject"></select>
+        <input type="date" id="newTaskDue">
+        <button class="btn primary" id="btnCreateTask">생성</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>태스크 <label class="muted" style="font-weight:400"><input type="checkbox" id="chkShowDone"> 완료 포함</label></h2>
+      <table id="taskTable">
+        <thead><tr><th></th><th>태스크</th><th>프로젝트</th><th>담당</th><th>요청자</th><th>마감 (KST)</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ③ H201 (슬랙) -->
+  <section class="view" id="view-h201">
+    <div class="card">
+      <h2>Lists</h2>
+      <table id="listTable">
+        <thead><tr><th>항목</th><th>상태</th><th>담당</th><th>마감</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="muted" style="margin-top:8px">상태·마감은 여기서 바로 수정 가능(정식 Lists API). 반영 확인은 다음 5분 폴링.</p>
+    </div>
+    <div class="card">
+      <h2>@멘션 대화 <label class="muted" style="font-weight:400"><input type="checkbox" id="chkShowDoneMentions"> 처리됨 포함</label></h2>
+      <div id="mentionList"></div>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<!-- 설정 모달 (localStorage — 이 브라우저에만 저장) -->
+<div id="settingsModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:40;overflow:auto">
+  <div class="card" style="max-width:580px;margin:36px auto;padding:22px">
+    <h2 style="font-size:15px;margin-bottom:4px">대시보드 설정</h2>
+    <p class="muted" style="margin-bottom:14px">이 브라우저(localStorage)에만 저장돼요. 시크릿이 저장되니 <b>공용 PC에서는 사용하지 마세요.</b></p>
+    <div style="display:grid;gap:10px">
+      <label>Supabase URL<br><input type="text" id="setSbUrl" style="width:100%" placeholder="https://xxxx.supabase.co"></label>
+      <label>Supabase anon key<br><input type="text" id="setSbKey" style="width:100%" placeholder="eyJ..."></label>
+      <label>n8n 프록시 URL<br><input type="text" id="setPxUrl" style="width:100%" placeholder="https://xxxx.app.n8n.cloud/webhook/proxy"></label>
+      <label>프록시 시크릿 (X-Proxy-Secret)<br><input type="password" id="setPxSecret" style="width:100%"></label>
+      <label>아사나 프로젝트 <span class="muted">(한 줄에 하나: gid,프로젝트이름)</span><br><textarea id="setProjects" style="width:100%;min-height:64px" placeholder="120xxxxxxxxxxxxx,프로젝트 A"></textarea></label>
+      <label><input type="checkbox" id="setLlm"> 상위 3건 Claude 코멘트 사용</label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn primary" id="btnSaveSettings">저장하고 새로고침</button>
+      <button class="btn" id="btnCloseSettings">취소</button>
+      <button class="btn" id="btnClearSettings" style="margin-left:auto;color:var(--red)">설정 지우기</button>
+    </div>
+  </div>
+</div>
+
+<script src="priority.js"></script>
+<script src="config.js" onerror="console.info('config.js 없음 — localStorage 설정 사용')"></script>
+<script>
+'use strict';
+const P = window.PriorityEngine;
+
+// 설정 우선순위: config.js(로컬 개발) > localStorage(배포 환경 — 설정 버튼으로 입력)
+const LS_KEY = 'dash.config';
+function loadLocalConfig() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (e) { return {}; }
+}
+const FILE_CFG = window.DASH_CONFIG || {};
+const CFG = FILE_CFG.SUPABASE_URL ? FILE_CFG : Object.assign({ LLM_COMMENTS: true }, loadLocalConfig());
+const DEMO = !CFG.SUPABASE_URL;
+
+// 폴백 규칙 — 실제 가중치·등급 멤버는 rules 테이블(0001 시드)에서 로드됨
+const DEFAULT_RULES = {
+  weights: { deadline: 0.40, requester: 0.25, axis: 0.20, load: 0.15 },
+  axis_multiplier: { rawga: 1.0, h201: 1.3 },
+  requester_tiers: {
+    "대표": { boost: 40, members: [] },
+    "핵심": { boost: 20, members: [] },
+    "일반": { boost: 0, members: [] }
+  },
+  overdue_bonus: 50, due_today_bonus: 30, due_this_week_bonus: 15, no_assignee_penalty: 20
+};
+const WEIGHT_LABELS = { deadline: '마감', requester: '요청자', axis: '축(H201 배수)', load: '부하' };
+
+let S = { tasks: [], listItems: [], mentions: [], rules: null, view: 'unified', lastSync: null,
+  llm: { key: null, disabled: false, lastCall: 0 } };
+
+// ── 유틸 ─────────────────────────────────────────
+const $ = s => document.querySelector(s);
+const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtKST = d => new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+function toast(msg, isErr) {
+  const t = $('#toast');
+  t.textContent = msg; t.className = 'on' + (isErr ? ' err' : '');
+  clearTimeout(t._h); t._h = setTimeout(() => t.className = '', 2600);
+}
+const doneMentions = new Set(JSON.parse(localStorage.getItem('h201.mention.done') || '[]'));
+function saveDoneMentions() { localStorage.setItem('h201.mention.done', JSON.stringify([...doneMentions])); }
+
+// ── 데이터 로드 (읽기: Supabase anon / 쓰기: 전부 프록시) ──
+async function sbGet(path) {
+  const r = await fetch(CFG.SUPABASE_URL + '/rest/v1/' + path, {
+    headers: { apikey: CFG.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + CFG.SUPABASE_ANON_KEY }
+  });
+  if (!r.ok) throw new Error('Supabase HTTP ' + r.status);
+  return r.json();
+}
+async function loadAll() {
+  if (DEMO) { Object.assign(S, demoData()); return; }
+  const [tasks, listItems, mentions, rulesRows] = await Promise.all([
+    sbGet('tasks?select=*'),
+    sbGet('slack_list_items?select=*'),
+    sbGet('slack_mentions?select=*&order=message_ts.desc&limit=300'),
+    sbGet('rules?select=config&id=eq.priority')
+  ]);
+  S.tasks = tasks; S.listItems = listItems; S.mentions = mentions;
+  if (!S.rules) S.rules = (rulesRows[0] && rulesRows[0].config) || JSON.parse(JSON.stringify(DEFAULT_RULES));
+}
+async function postProxy(action, payload) {
+  if (DEMO) return { ok: false, error: '데모 모드 — config.js를 설정하세요' };
+  try {
+    const r = await fetch(CFG.N8N_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Proxy-Secret': CFG.N8N_PROXY_SECRET },
+      body: JSON.stringify({ action, payload })
+    });
+    return await r.json();
+  } catch (e) { return { ok: false, error: '프록시 연결 실패: ' + e.message }; }
+}
+
+// ── 렌더: ① 통합 ─────────────────────────────────
+function activeMentions() { return S.mentions.filter(m => !doneMentions.has(m.message_ts)); }
+function renderUnified() {
+  const res = P.scoreAll({ tasks: S.tasks, listItems: S.listItems, mentions: activeMentions() }, S.rules);
+  $('#todayLabel').textContent = '오늘(KST): ' + res.todayStr + ' · 표시 ' + res.items.length + '건';
+  const c = { overdue: 0, today: 0, this_week: 0 };
+  res.items.forEach(i => { if (c[i.breakdown.bucket] != null) c[i.breakdown.bucket]++; });
+  $('#counts').innerHTML =
+    `<div class="count red"><b>${c.overdue}</b><span class="muted">지연</span></div>` +
+    `<div class="count orange"><b>${c.today}</b><span class="muted">오늘</span></div>` +
+    `<div class="count yellow"><b>${c.this_week}</b><span class="muted">이번주</span></div>`;
+  const kindName = { task: '아사나 태스크', list_item: 'Lists 항목', mention: '@멘션' };
+  $('#priorityList').innerHTML = res.items.map(i => `
+    <div class="item ${i.breakdown.bucket}">
+      <span class="badge ${i.axis}">${i.axis === 'rawga' ? '로가' : 'H201'}</span>
+      <div class="body">
+        ${i.url ? `<a class="title" href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a>` : `<span class="title">${esc(i.title)}</span>`}
+        <span class="kindTag"> · ${kindName[i.kind]}${i.assignee ? ' · ' + esc(i.assignee) : ''}${i.due_date ? ' · ~' + esc(i.due_date) : ''}</span>
+        <div class="chips">${i.reasons.map(r => `<chip class="chip ${/지연/.test(r) ? 'hot' : ''}">${esc(r)}</chip>`).join('')}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="score">${i.score}</div>
+        ${i.kind === 'task' ? `<button class="btn sm" data-act="task-done" data-gid="${esc(i.meta.task_gid)}">완료</button>` : ''}
+      </div>
+    </div>`).join('') || '<p class="muted">표시할 항목이 없습니다.</p>';
+  maybeLoadLlmComments(res.items.slice(0, 3));
+}
+
+// ── 상위 3건 LLM 코멘트 (SPEC 4.3 — 설명 전용, 순위 판단 없음) ──
+function renderLlmCard(top3, comments) {
+  const card = $('#llmCard');
+  card.style.display = 'block';
+  card.innerHTML = '<h2>왜 지금 이 3건인가 <span class="muted" style="font-weight:400">Claude 코멘트</span></h2>' +
+    top3.map((i, idx) => `
+      <div style="margin-bottom:7px">
+        <span class="badge ${i.axis}">${i.axis === 'rawga' ? '로가' : 'H201'}</span>
+        <b>${esc(i.title.slice(0, 42))}</b>
+        <div class="muted" style="margin-left:2px">→ ${esc(comments[idx] || '')}</div>
+      </div>`).join('');
+}
+async function maybeLoadLlmComments(top3) {
+  const card = $('#llmCard');
+  if (!top3.length || CFG.LLM_COMMENTS === false) { card.style.display = 'none'; return; }
+  if (DEMO) {
+    renderLlmCard(top3, ['(데모) 마감 이틀 지연에 대표 직접 요청 건', '(데모) 오늘 마감인데 담당자가 없음', '(데모) 대표 멘션 — 회신 대기 중']);
+    return;
+  }
+  if (S.llm.disabled) { card.style.display = 'none'; return; }
+  const key = top3.map(i => i.key).join('|');
+  if (key === S.llm.key || Date.now() - S.llm.lastCall < 60000) return; // 구성 동일 or 60초 쿨다운
+  S.llm.key = key; S.llm.lastCall = Date.now();
+  const res = await postProxy('llm.comment', {
+    items: top3.map(i => ({ title: i.title, axis: i.axis, kind: i.kind, due_date: i.due_date, requester: i.requester, assignee: i.assignee, reasons: i.reasons, score: i.score }))
+  });
+  if (key !== S.llm.key) return; // 대기 중 재정렬됨 — 결과 폐기
+  if (res.ok && res.result && Array.isArray(res.result.comments)) {
+    renderLlmCard(top3, res.result.comments);
+  } else {
+    // Anthropic credential 미설정 등 — 이 세션에선 조용히 비활성
+    S.llm.disabled = true;
+    card.style.display = 'none';
+    console.warn('LLM 코멘트 비활성:', res.error || res);
+  }
+}
+function renderSliders() {
+  $('#sliders').innerHTML = Object.keys(WEIGHT_LABELS).map(k => `
+    <div class="slider-row">
+      <label><span>${WEIGHT_LABELS[k]}</span><b id="wv-${k}">${S.rules.weights[k].toFixed(2)}</b></label>
+      <input type="range" min="0" max="1" step="0.05" value="${S.rules.weights[k]}" data-w="${k}">
+    </div>`).join('');
+}
+
+// ── 렌더: ② 로가 ─────────────────────────────────
+function renderRawga() {
+  const sel = $('#newTaskProject');
+  const projects = CFG.ASANA_PROJECTS || [];
+  sel.innerHTML = projects.map(p => `<option value="${esc(p.gid)}">${esc(p.name)}</option>`).join('')
+    || '<option value="">config.js에 ASANA_PROJECTS 설정</option>';
+  const showDone = $('#chkShowDone').checked;
+  const rows = S.tasks
+    .filter(t => showDone || !P.DONE_RE.test(t.status || ''))
+    .sort((a, b) => (a.due_date || '9999') < (b.due_date || '9999') ? -1 : 1);
+  $('#taskTable tbody').innerHTML = rows.map(t => {
+    const done = P.DONE_RE.test(t.status || '');
+    return `<tr class="${done ? 'done' : ''}">
+      <td><input type="checkbox" data-act="task-toggle" data-gid="${esc(t.task_id)}" ${done ? 'checked' : ''}></td>
+      <td>${t.permalink_url ? `<a href="${esc(t.permalink_url)}" target="_blank" rel="noopener">${esc(t.name)}</a>` : esc(t.name)}</td>
+      <td class="muted">${esc(t.project || '')}</td>
+      <td>${esc(t.assignee || '—')}</td>
+      <td>${esc(t.requester || '—')}</td>
+      <td><input class="inline-date" type="date" value="${esc(t.due_date || '')}" data-act="task-due" data-gid="${esc(t.task_id)}"></td>
+      <td class="muted">${t.modified_at ? fmtKST(new Date(t.modified_at)) : ''}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="muted">태스크 없음</td></tr>';
+}
+
+// ── 렌더: ③ H201 ─────────────────────────────────
+function renderH201() {
+  const statuses = [...new Set(S.listItems.map(li => li.status).filter(Boolean))];
+  $('#listTable tbody').innerHTML = S.listItems
+    .slice().sort((a, b) => (a.due_date || '9999') < (b.due_date || '9999') ? -1 : 1)
+    .map(li => {
+      const opts = [...new Set([li.status, ...statuses])].filter(Boolean)
+        .map(s => `<option ${s === li.status ? 'selected' : ''}>${esc(s)}</option>`).join('');
+      const editable = !!li.list_id;
+      return `<tr class="${P.DONE_RE.test(li.status || '') ? 'done' : ''}">
+        <td>${li.permalink ? `<a href="${esc(li.permalink)}" target="_blank" rel="noopener">${esc(li.title)}</a>` : esc(li.title)}</td>
+        <td>${editable
+          ? `<select data-act="list-status" data-id="${esc(li.list_item_id)}" data-list="${esc(li.list_id)}">${opts}</select>`
+          : `<span>${esc(li.status || '—')}</span>`}</td>
+        <td>${esc(li.assignee || '—')}</td>
+        <td>${editable
+          ? `<input class="inline-date" type="date" value="${esc(li.due_date || '')}" data-act="list-due" data-id="${esc(li.list_item_id)}" data-list="${esc(li.list_id)}">`
+          : `<span>${esc(li.due_date || '—')}</span>`}</td>
+        <td class="muted">${editable ? '' : 'list_id 미수집(재폴링 대기)'}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" class="muted">Lists 항목 없음</td></tr>';
+
+  const showDone = $('#chkShowDoneMentions').checked;
+  const ms = S.mentions.filter(m => showDone || !doneMentions.has(m.message_ts));
+  $('#mentionList').innerHTML = ms.map(m => {
+    const done = doneMentions.has(m.message_ts);
+    const ts = fmtKST(new Date(parseFloat(m.message_ts) * 1000));
+    return `<div class="mention ${done ? 'doneLocal' : ''}" data-ts="${esc(m.message_ts)}">
+      <div class="head"><span class="author">${esc(m.author || '?')}</span><span class="muted">${ts}${m.thread_ts ? ' · 스레드' : ''}</span></div>
+      <div class="txt">${esc(m.text)}</div>
+      <div class="acts">
+        <button class="btn sm" data-act="reply-toggle">답장</button>
+        <button class="btn sm" data-act="mention-done">${done ? '처리 취소' : '처리됨'}</button>
+        ${m.permalink ? `<a class="btn sm" href="${esc(m.permalink)}" target="_blank" rel="noopener" style="text-decoration:none">Slack 열기</a>` : ''}
+      </div>
+      <div class="replyBox">
+        <textarea placeholder="스레드로 답장…"></textarea>
+        <button class="btn primary" data-act="reply-send" data-ch="${esc(m.channel_id)}" data-thread="${esc(m.thread_ts || m.message_ts)}">전송</button>
+      </div>
+    </div>`;
+  }).join('') || '<p class="muted">멘션 없음</p>';
+}
+
+function renderAll() { renderUnified(); renderRawga(); renderH201(); }
+
+// ── 액션 (전부 프록시 경유, 낙관적 반영) ──────────
+async function taskSetDone(gid, completed) {
+  const res = await postProxy('asana.update_status', { task_gid: gid, completed });
+  if (res.ok) {
+    const t = S.tasks.find(x => x.task_id === gid);
+    if (t) t.status = completed ? 'completed' : 'active';
+    toast(completed ? '완료 처리했어요' : '재개했어요'); renderAll();
+  } else toast(res.error || '실패', true);
+}
+document.body.addEventListener('click', async e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.dataset.act;
+  if (act === 'task-done') taskSetDone(el.dataset.gid, true);
+  if (act === 'reply-toggle') el.closest('.mention').querySelector('.replyBox').classList.toggle('on');
+  if (act === 'mention-done') {
+    const ts = el.closest('.mention').dataset.ts;
+    doneMentions.has(ts) ? doneMentions.delete(ts) : doneMentions.add(ts);
+    saveDoneMentions(); renderUnified(); renderH201();
+  }
+  if (act === 'reply-send') {
+    const box = el.closest('.replyBox'), text = box.querySelector('textarea').value.trim();
+    if (!text) return toast('답장 내용을 입력하세요', true);
+    el.disabled = true;
+    const res = await postProxy('slack.reply', { channel_id: el.dataset.ch, text, thread_ts: el.dataset.thread });
+    el.disabled = false;
+    if (res.ok) { box.querySelector('textarea').value = ''; box.classList.remove('on'); toast('답장을 보냈어요'); }
+    else toast(res.error || '전송 실패', true);
+  }
+});
+document.body.addEventListener('change', async e => {
+  const el = e.target;
+  if (el.dataset.w) { // 가중치 슬라이더
+    S.rules.weights[el.dataset.w] = parseFloat(el.value);
+    $('#wv-' + el.dataset.w).textContent = parseFloat(el.value).toFixed(2);
+    renderUnified(); return;
+  }
+  const act = el.dataset.act;
+  if (act === 'task-toggle') taskSetDone(el.dataset.gid, el.checked);
+  if (act === 'task-due') {
+    const res = await postProxy('asana.update_due', { task_gid: el.dataset.gid, due_on: el.value || null });
+    if (res.ok) {
+      const t = S.tasks.find(x => x.task_id === el.dataset.gid);
+      if (t) t.due_date = el.value || null;
+      toast('마감을 수정했어요'); renderUnified();
+    } else toast(res.error || '실패', true);
+  }
+  if (act === 'list-status' || act === 'list-due') {
+    const field = act === 'list-status' ? 'status' : 'due_date';
+    const value = el.value || null;
+    const res = await postProxy('lists.update_item', { list_id: el.dataset.list, item_id: el.dataset.id, field, value });
+    if (res.ok) {
+      const li = S.listItems.find(x => x.list_item_id === el.dataset.id);
+      if (li) li[field] = value;
+      toast('Lists 항목을 수정했어요 (폴링 반영 최대 5분)'); renderUnified(); renderH201();
+    } else toast(res.error || '실패', true);
+  }
+  if (el.id === 'chkShowDone') renderRawga();
+  if (el.id === 'chkShowDoneMentions') renderH201();
+});
+$('#btnCreateTask').addEventListener('click', async () => {
+  const name = $('#newTaskName').value.trim(), project_gid = $('#newTaskProject').value;
+  if (!name) return toast('태스크 이름을 입력하세요', true);
+  if (!project_gid) return toast('프로젝트를 설정하세요 (config.js)', true);
+  const payload = { name, project_gid };
+  if ($('#newTaskDue').value) payload.due_on = $('#newTaskDue').value;
+  const res = await postProxy('asana.create_task', payload);
+  if (res.ok) {
+    S.tasks.push({ task_id: res.result.gid, name, assignee: null, requester: null, due_date: payload.due_on || null, status: 'active', project: ($('#newTaskProject').selectedOptions[0] || {}).text || null, permalink_url: res.result.permalink_url, modified_at: new Date().toISOString() });
+    $('#newTaskName').value = ''; $('#newTaskDue').value = '';
+    toast('태스크를 생성했어요'); renderAll();
+  } else toast(res.error || '생성 실패', true);
+});
+$('#btnSaveRules').addEventListener('click', async () => {
+  const res = await postProxy('rules.save', { config: S.rules });
+  res.ok ? toast('규칙을 저장했어요') : toast(res.error || '저장 실패', true);
+});
+$('#btnResetRules').addEventListener('click', () => {
+  S.rules = JSON.parse(JSON.stringify(DEFAULT_RULES));
+  renderSliders(); renderUnified();
+  toast('기본값으로 되돌렸어요 (저장하려면 규칙 저장)');
+});
+$('#btnRefresh').addEventListener('click', () => refresh(true));
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + b.dataset.view));
+}));
+
+// ── 데모 데이터 (config.js 없을 때 UI 확인용) ─────
+function demoData() {
+  const today = P.kstToday();
+  const d = (n) => { const p = today.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); };
+  const demoRules = JSON.parse(JSON.stringify(DEFAULT_RULES));
+  demoRules.requester_tiers["대표"].members = ['김대표', '나대표'];
+  demoRules.requester_tiers["핵심"].members = ['이핵심'];
+  return {
+    tasks: [
+      { task_id: '1', name: '상표 출원 서류 보완', assignee: '이핵심', requester: '김대표', due_date: d(-2), status: 'active', project: '데모 IP', permalink_url: '#', modified_at: new Date().toISOString() },
+      { task_id: '2', name: '3분기 대출 만기 대응안 초안', assignee: null, requester: '나대표', due_date: d(0), status: 'active', project: '데모 재무', permalink_url: '#', modified_at: new Date().toISOString() },
+      { task_id: '3', name: '홈페이지 리뉴얼 카피 검토', assignee: '최담당', requester: '아무개', due_date: d(9), status: 'active', project: '데모 마케팅', permalink_url: '#', modified_at: new Date().toISOString() },
+      { task_id: '4', name: '지난 정산 마감(완료)', assignee: '이핵심', requester: null, due_date: d(-7), status: 'completed', project: '데모 재무', permalink_url: '#', modified_at: new Date().toISOString() }
+    ],
+    listItems: [
+      { list_item_id: 'r1', list_id: 'F001', title: '엘리베이터 정기점검 일정 확정', assignee: '최담당', due_date: d(2), status: '진행중', channel_id: 'C1', permalink: '#' },
+      { list_item_id: 'r2', list_id: 'F001', title: '임대차 계약 갱신 통지', assignee: null, due_date: d(-1), status: '대기', channel_id: 'C1', permalink: '#' },
+      { list_item_id: 'r3', list_id: 'F001', title: '소방 점검 결과 보고(완료)', assignee: '최담당', due_date: d(-10), status: '완료', channel_id: 'C1', permalink: '#' }
+    ],
+    mentions: [
+      { message_ts: String(Date.now() / 1000 - 3600), channel_id: 'C2', text: '@담당자 2층 누수 관련 업체 견적 확인 부탁드려요', author: '김대표', thread_ts: null, permalink: '#' },
+      { message_ts: String(Date.now() / 1000 - 86400), channel_id: 'C2', text: '@담당자 주차장 CCTV 교체 건 진행 상황 공유 가능할까요?', author: '아무개', thread_ts: null, permalink: '#' }
+    ],
+    rules: demoRules,
+    lastSync: new Date()
+  };
+}
+
+// ── 설정 모달 (localStorage) ──────────────────────
+function openSettings() {
+  $('#setSbUrl').value = CFG.SUPABASE_URL || '';
+  $('#setSbKey').value = CFG.SUPABASE_ANON_KEY || '';
+  $('#setPxUrl').value = CFG.N8N_PROXY_URL || '';
+  $('#setPxSecret').value = CFG.N8N_PROXY_SECRET || '';
+  $('#setProjects').value = (CFG.ASANA_PROJECTS || []).map(p => p.gid + ',' + p.name).join('\n');
+  $('#setLlm').checked = CFG.LLM_COMMENTS !== false;
+  $('#settingsModal').style.display = 'block';
+}
+$('#btnSettings').addEventListener('click', openSettings);
+$('#demoBadge').addEventListener('click', openSettings);
+$('#btnCloseSettings').addEventListener('click', () => $('#settingsModal').style.display = 'none');
+$('#settingsModal').addEventListener('click', e => { if (e.target.id === 'settingsModal') $('#settingsModal').style.display = 'none'; });
+$('#btnSaveSettings').addEventListener('click', () => {
+  const projects = $('#setProjects').value.split('\n').map(l => l.trim()).filter(Boolean)
+    .map(l => { const i = l.indexOf(','); return i > 0 ? { gid: l.slice(0, i).trim(), name: l.slice(i + 1).trim() } : null; })
+    .filter(Boolean);
+  const cfg = {
+    SUPABASE_URL: $('#setSbUrl').value.trim().replace(/\/$/, ''),
+    SUPABASE_ANON_KEY: $('#setSbKey').value.trim(),
+    N8N_PROXY_URL: $('#setPxUrl').value.trim(),
+    N8N_PROXY_SECRET: $('#setPxSecret').value.trim(),
+    ASANA_PROJECTS: projects,
+    LLM_COMMENTS: $('#setLlm').checked
+  };
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) return toast('Supabase URL과 anon key는 필수예요', true);
+  localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+  location.reload();
+});
+$('#btnClearSettings').addEventListener('click', () => {
+  if (!confirm('저장된 설정을 지우고 데모 모드로 돌아갈까요?')) return;
+  localStorage.removeItem(LS_KEY);
+  location.reload();
+});
+
+// ── 시작 ─────────────────────────────────────────
+async function refresh(manual) {
+  try {
+    await loadAll();
+    S.lastSync = new Date();
+    $('#syncInfo').textContent = '동기화: ' + fmtKST(S.lastSync) + ' KST';
+    renderAll();
+    if (manual) toast('새로고침 완료');
+  } catch (e) {
+    $('#syncInfo').textContent = '로드 실패: ' + e.message;
+    toast('데이터 로드 실패: ' + e.message, true);
+  }
+}
+(async function init() {
+  if (DEMO) $('#demoBadge').style.display = 'inline-block';
+  if (!S.rules && DEMO) S.rules = JSON.parse(JSON.stringify(DEFAULT_RULES));
+  await refresh(false);
+  renderSliders();
+  setInterval(() => refresh(false), 60000); // 60초 자동 새로고침
+})();
+</script>
+</body>
+</html>

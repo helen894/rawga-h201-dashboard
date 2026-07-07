@@ -1,0 +1,12 @@
+# 시크릿/로컬 설정
+.env
+.env.example
+config.js
+node_modules/
+
+# 공개 저장소 제외 — 내부 운영 문서·백엔드 설정 (로컬 원본은 이 폴더에 유지)
+SPEC.md
+CLAUDE_CODE_PROMPT.md
+RUNBOOK.md
+n8n/
+supabase/

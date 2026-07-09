@@ -62,15 +62,21 @@
   }
 
   // ── 요청자 등급 ───────────────────────────────────────────
-  /** 이름 → 등급명. 미등록자/이름없음은 '일반' (SPEC 4.2) */
+  /** 슬랙 표시명이 "이름/부서" 형식인 워크스페이스가 있어 '/' 앞부분으로 정규화 */
+  function baseName(name) {
+    return String(name).trim().split('/')[0].trim();
+  }
+  /** 이름 → 등급명. 미등록자/이름없음은 '일반' (SPEC 4.2). 완전일치 또는 기본이름 일치 */
   function lookupTier(name, rules) {
     if (!name) return '일반';
     var tiers = (rules && rules.requester_tiers) || {};
     var trimmed = String(name).trim();
+    var base = baseName(trimmed);
     for (var tier in tiers) {
       var members = tiers[tier].members || [];
       for (var i = 0; i < members.length; i++) {
-        if (members[i] === trimmed) return tier;
+        var m = String(members[i]).trim();
+        if (m === trimmed || baseName(m) === base) return tier;
       }
     }
     return '일반';

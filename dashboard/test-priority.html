@@ -49,6 +49,9 @@ eq('이핵심=핵심', P.lookupTier('이핵심', RULES), '핵심');
 eq('미등록=일반', P.lookupTier('아무개', RULES), '일반');
 eq('null=일반', P.lookupTier(null, RULES), '일반');
 eq('공백 트림', P.lookupTier(' 나대표 ', RULES), '대표');
+eq('슬랙 표시명 "이름/부서" 매칭', P.lookupTier('김대표/경영지원', RULES), '대표');
+eq('명단 쪽에 접미사 있어도 매칭', P.lookupTier('이핵심', { requester_tiers: { "핵심": { boost: 20, members: ['이핵심/시설'] } } }), '핵심');
+eq('기본이름 다르면 불일치', P.lookupTier('김대표원/경영', RULES), '일반');
 
 // ── 3. 점수 계산 (기본 가중치 = 액면가) ──
 const data = {

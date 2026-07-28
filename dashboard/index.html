@@ -136,7 +136,10 @@
       </div>
     </div>
     <div class="card">
-      <h2>태스크 <label class="muted" style="font-weight:400"><input type="checkbox" id="chkShowDone"> 완료 포함</label></h2>
+      <h2>태스크
+        <select id="fltTaskAssignee" style="font-weight:400;font-size:12px;margin-left:6px"></select>
+        <label class="muted" style="font-weight:400;margin-left:6px"><input type="checkbox" id="chkShowDone"> 완료 포함</label>
+      </h2>
       <table id="taskTable">
         <thead><tr><th></th><th>태스크</th><th>프로젝트</th><th>담당</th><th>요청자</th><th>마감 (KST)</th><th></th></tr></thead>
         <tbody></tbody>
@@ -147,7 +150,9 @@
   <!-- ③ H201 (슬랙) -->
   <section class="view" id="view-h201">
     <div class="card">
-      <h2>Lists</h2>
+      <h2>Lists
+        <select id="fltListAssignee" style="font-weight:400;font-size:12px;margin-left:6px"></select>
+      </h2>
       <table id="listTable">
         <thead><tr><th>항목</th><th>상태</th><th>담당</th><th>마감</th><th></th></tr></thead>
         <tbody></tbody>
@@ -212,7 +217,8 @@ const DEFAULT_RULES = {
 const WEIGHT_LABELS = { deadline: '마감', requester: '요청자', axis: '축(H201 배수)', load: '부하' };
 
 let S = { tasks: [], listItems: [], mentions: [], rules: null, view: 'unified', lastSync: null,
-  llm: { key: null, disabled: false, lastCall: 0 } };
+  llm: { key: null, disabled: false, lastCall: 0 },
+  filters: { task: '', list: '' } }; // 담당자 필터 (''=전체, '__none'=담당자 없음)
 
 // ── 유틸 ─────────────────────────────────────────
 const $ = s => document.querySelector(s);
@@ -330,14 +336,28 @@ function renderSliders() {
 }
 
 // ── 렌더: ② 로가 ─────────────────────────────────
+// 담당자 필터 셀렉트 구성 (현재 선택 유지)
+function buildAssigneeOptions(selEl, items, current) {
+  const names = [...new Set(items.map(i => i.assignee).filter(Boolean))].sort();
+  selEl.innerHTML = '<option value="">담당자 전체</option>'
+    + names.map(n => `<option value="${esc(n)}" ${current === n ? 'selected' : ''}>${esc(n)}</option>`).join('')
+    + `<option value="__none" ${current === '__none' ? 'selected' : ''}>담당자 없음</option>`;
+}
+function matchAssignee(assignee, filter) {
+  if (!filter) return true;
+  if (filter === '__none') return !assignee;
+  return assignee === filter;
+}
 function renderRawga() {
   const sel = $('#newTaskProject');
   const projects = CFG.ASANA_PROJECTS || [];
   sel.innerHTML = projects.map(p => `<option value="${esc(p.gid)}">${esc(p.name)}</option>`).join('')
     || '<option value="">config.js에 ASANA_PROJECTS 설정</option>';
+  buildAssigneeOptions($('#fltTaskAssignee'), S.tasks, S.filters.task);
   const showDone = $('#chkShowDone').checked;
   const rows = S.tasks
     .filter(t => showDone || !P.DONE_RE.test(t.status || ''))
+    .filter(t => matchAssignee(t.assignee, S.filters.task))
     .sort((a, b) => (a.due_date || '9999') < (b.due_date || '9999') ? -1 : 1);
   $('#taskTable tbody').innerHTML = rows.map(t => {
     const done = P.DONE_RE.test(t.status || '');
@@ -356,7 +376,9 @@ function renderRawga() {
 // ── 렌더: ③ H201 ─────────────────────────────────
 function renderH201() {
   const statuses = [...new Set(S.listItems.map(li => li.status).filter(Boolean))];
+  buildAssigneeOptions($('#fltListAssignee'), S.listItems, S.filters.list);
   $('#listTable tbody').innerHTML = S.listItems
+    .filter(li => matchAssignee(li.assignee, S.filters.list))
     .slice().sort((a, b) => (a.due_date || '9999') < (b.due_date || '9999') ? -1 : 1)
     .map(li => {
       const opts = [...new Set([li.status, ...statuses])].filter(Boolean)
@@ -457,6 +479,8 @@ document.body.addEventListener('change', async e => {
   }
   if (el.id === 'chkShowDone') renderRawga();
   if (el.id === 'chkShowDoneMentions') renderH201();
+  if (el.id === 'fltTaskAssignee') { S.filters.task = el.value; renderRawga(); }
+  if (el.id === 'fltListAssignee') { S.filters.list = el.value; renderH201(); }
 });
 $('#btnCreateTask').addEventListener('click', async () => {
   const name = $('#newTaskName').value.trim(), project_gid = $('#newTaskProject').value;
